@@ -2,11 +2,13 @@ import React, { useCallback } from 'react';
 import TimeSlot from './TimeSlot';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../utils/theme';
+import { start } from 'node:repl';
 
 interface Props {
   slotTimes: string[];
-  selectedTime: string;
-  setSelectedTime: (value: string) => void;
+  startTime: string | null; // Changed
+  endTime: string | null;   // Added
+  setRange: (start: string | null, end: string | null) => void;
   title?: string;
   backgroundColor?: string;
   mainColor?: string;
@@ -14,13 +16,26 @@ interface Props {
 
 const TimeSlots = ({
   slotTimes,
-  selectedTime,
-  setSelectedTime,
+  startTime,
+  endTime,
+  setRange,
   title = 'Select time',
   backgroundColor = theme.colors.white,
 }: Props) => {
-  const onPress = (value: string) => {
-    setSelectedTime(value);
+  const onPress = (clickedTime: string) => {
+    if (!startTime || (startTime && endTime)) {
+      // Start a new selection if nothing is selected or if a range was already complete
+      setRange(clickedTime, null);
+    } else if (clickedTime < startTime) {
+      // If they click a time BEFORE the start, make that the new start
+      setRange(clickedTime, null);
+    } else if (clickedTime === startTime) {
+      // Deselect if they click the same one
+      setRange(null, null);
+    } else {
+      // It's after the start, so it's the end!
+      setRange(startTime, clickedTime);
+    }
   };
 
   const getTimeSlots = useCallback(() => {
@@ -30,13 +45,14 @@ const TimeSlots = ({
           <TimeSlot
             onPress={() => onPress(time)}
             value={time}
-            selectedTime={selectedTime}
+            startTime={startTime} // Pass these down
+            endTime={endTime}     // Pass these down
           />
         </View>
       );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slotTimes, selectedTime]);
+  }, [slotTimes, startTime, endTime]);
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
