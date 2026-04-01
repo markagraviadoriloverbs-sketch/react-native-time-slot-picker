@@ -19,19 +19,13 @@ const TimeSlot = ({ value, onPress, startTime, endTime }: Props) => {
   const selectedDate = useContext(SelectedDateContext);
   const { mainColor, timeSlotWidth } = useContext(OverrideDataContext);
 
-  // Robust helper to convert "09:30 AM" to minutes
   const convertToMinutes = (timeString: string | null | undefined): number => {
     if (!timeString) return -1;
-
-    // Destructuring with defaults prevents "possibly undefined"
     const [time = "", modifier = ""] = timeString.split(' ');
     const [hoursStr = "0", minutesStr = "0"] = time.split(':');
-
     let hours = parseInt(hoursStr, 10);
     const minutes = parseInt(minutesStr, 10);
-
     if (isNaN(hours) || isNaN(minutes) || !modifier) return -1;
-
     const upperModifier = modifier.toUpperCase();
     if (hours === 12) {
       hours = upperModifier === 'AM' ? 0 : 12;
@@ -41,34 +35,40 @@ const TimeSlot = ({ value, onPress, startTime, endTime }: Props) => {
     return hours * 60 + minutes;
   };
 
-  const isSelected = value !== null && (value === startTime || value === endTime);
+  // 1. Identify specific positions in the range
+  const isStart = value === startTime;
+  const isEnd = value === endTime;
+  const isSelected = isStart || isEnd;
 
   const isBetween = useMemo(() => {
     if (!startTime || !endTime) return false;
-
     const currentVal = convertToMinutes(value);
     const startVal = convertToMinutes(startTime);
     const endVal = convertToMinutes(endTime);
-
     if (currentVal === -1 || startVal === -1 || endVal === -1) return false;
 
+    // Use min/max to support selecting end before start visually
     const min = Math.min(startVal, endVal);
     const max = Math.max(startVal, endVal);
-
     return currentVal > min && currentVal < max;
   }, [value, startTime, endTime]);
 
+  // 2. Define the colors
+  // You can replace '#FFD700' with whatever secondary color fits your Retro aesthetic
+  const startColor = mainColor;
+  const endColor = '#FF5722'; // Example: A Deep Orange/Red for the End slot
+
   const containerStyle = useMemo(() => {
-    if (isSelected) return { backgroundColor: mainColor };
-    if (isBetween) return { backgroundColor: mainColor + '40' };
+    if (isStart) return { backgroundColor: startColor };
+    if (isEnd) return { backgroundColor: endColor };
+    if (isBetween) return { backgroundColor: startColor + '40' }; // Semi-transparent bridge
     return styles.unSelected;
-  }, [isSelected, isBetween, mainColor]);
+  }, [isStart, isEnd, isBetween, startColor, endColor]);
 
   const appointmentDateToCompare = useMemo(
     () => scheduledAppointment?.appointmentDate?.split('T')[0],
     [scheduledAppointment?.appointmentDate]
   );
-
   const selectedDateToCompare = useMemo(
     () => selectedDate.split('T')[0],
     [selectedDate]
