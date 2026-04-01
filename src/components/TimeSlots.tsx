@@ -2,7 +2,6 @@ import React, { useCallback } from 'react';
 import TimeSlot from './TimeSlot';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../utils/theme';
-import { start } from 'node:repl';
 
 interface Props {
   slotTimes: string[];
