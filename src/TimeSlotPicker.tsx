@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { IAppointment, IAvailableDates } from './interfaces/app.interface';
 import { View } from 'react-native';
 import ScheduleDatePicker from './components/ScheduleDatePicker';
@@ -13,7 +13,8 @@ import {
 import { LocalContext } from './components/LocalContext';
 
 interface Props {
-  setDateOfAppointment: (data: IAppointment | null) => void;
+  // Update the callback to handle start and end times
+  setDateOfAppointment: (data: any | null) => void;
   availableDates?: IAvailableDates[];
   scheduledAppointment?: IAppointment | undefined;
   marginTop?: number;
@@ -39,31 +40,47 @@ const TimeSlotPicker = ({
   dayNamesOverride = defaultDayNames,
   monthNamesOverride = defaultMonthNames,
 }: Props) => {
-  const [selectedTime, setSelectedTime] = useState<string>('');
+  // 1. Change state to track range
+  const [startTime, setStartTime] = useState<string | null>(null);
+  const [endTime, setEndTime] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<IAvailableDates | undefined>(
     availableDates[0]
   );
 
+  // Reset times when the date changes to prevent cross-day ranges
+  const handleSetSelectedDate = (date: IAvailableDates) => {
+    setSelectedDate(date);
+    setStartTime(null);
+    setEndTime(null);
+  };
+
   useEffect(() => {
-    // Get first day with available appointments
     const firstAvailableDay =
       availableDates.findIndex((date) => date.slotTimes.length > 0) || 0;
     setSelectedDate(availableDates?.[firstAvailableDay]);
-    setSelectedTime(availableDates?.[firstAvailableDay]?.slotTimes?.[0] || '');
+    // We no longer auto-select the first slot to avoid confusing the range logic
+    setStartTime(null);
+    setEndTime(null);
   }, [availableDates]);
 
-  // If any changes on date and time selected update data of appointment
+  // 2. Sync the range back to the parent form
   useEffect(() => {
-    if (selectedDate && selectedTime) {
+    if (selectedDate && startTime) {
       setDateOfAppointment({
         appointmentDate: selectedDate.date,
-        appointmentTime: selectedTime,
+        startTime: startTime,
+        endTime: endTime, // This will be null until the user picks a second slot
       });
     } else {
       setDateOfAppointment(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, selectedTime]);
+  }, [selectedDate, startTime, endTime, setDateOfAppointment]);
+
+  // 3. Helper to reset the range (used when switching dates)
+  const setRange = useCallback((start: string | null, end: string | null) => {
+    setStartTime(start);
+    setEndTime(end);
+  }, []);
 
   return (
     <LocalContext
@@ -81,8 +98,10 @@ const TimeSlotPicker = ({
           <ScheduleDatePicker
             selectedDate={selectedDate}
             availableDates={availableDates}
-            setSelectedDate={setSelectedDate}
-            setSelectedTime={setSelectedTime}
+            setSelectedDate={handleSetSelectedDate}
+            // Passing a dummy function for backward compatibility if needed, 
+            // or you can update ScheduleDatePicker to ignore this.
+            setSelectedTime={() => { }}
             scheduledAppointment={scheduledAppointment}
             backgroundColor={datePickerBackgroundColor}
           />
@@ -90,10 +109,12 @@ const TimeSlotPicker = ({
         {selectedDate && (
           <TimeSlots
             title={timeSlotsTitle}
-            selectedTime={selectedTime}
-            setSelectedTime={setSelectedTime}
+            startTime={startTime}
+            endTime={endTime}
+            setRange={setRange}
             slotTimes={selectedDate.slotTimes}
             backgroundColor={timeSlotsBackgroundColor}
+            mainColor={mainColor}
           />
         )}
       </View>
