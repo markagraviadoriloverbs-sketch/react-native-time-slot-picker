@@ -10,37 +10,61 @@ import {
 interface Props {
   value: string;
   onPress: () => void;
-  selectedTime: string;
+  startTime: string | null;
+  endTime: string | null;
 }
 
-const TimeSlot = ({ value, onPress, selectedTime }: Props) => {
-  const isSelected = selectedTime === value;
+const TimeSlot = ({ value, onPress, startTime, endTime }: Props) => {
   const scheduledAppointment = useContext(ScheduledAppointmentContext);
   const selectedDate = useContext(SelectedDateContext);
   const { mainColor, timeSlotWidth } = useContext(OverrideDataContext);
+
+  // Helper: Converts "09:30 AM" to 570 (minutes from midnight)
+  const convertToMinutes = (timeString: string | null) => {
+    if (!timeString) return -1;
+    const [time, modifier] = timeString.split(' ');
+    let [hours, minutes] = time.split(':').map(Number);
+
+    if (hours === 12) {
+      hours = modifier === 'AM' ? 0 : 12;
+    } else if (modifier === 'PM') {
+      hours += 12;
+    }
+    return hours * 60 + minutes;
+  };
+
+  const isSelected = value === startTime || value === endTime;
+
+  const isBetween = useMemo(() => {
+    if (!startTime || !endTime) return false;
+    const currentVal = convertToMinutes(value);
+    const startVal = convertToMinutes(startTime);
+    const endVal = convertToMinutes(endTime);
+
+    // Check range based on numerical values
+    return currentVal > startVal && currentVal < endVal;
+  }, [value, startTime, endTime]);
 
   const appointmentDateToCompare = useMemo(
     () => scheduledAppointment?.appointmentDate?.split('T')[0],
     [scheduledAppointment?.appointmentDate]
   );
+
   const selectedDateToCompare = useMemo(
     () => selectedDate.split('T')[0],
     [selectedDate]
   );
 
-  const appointmentDot = useMemo(() => {
-    return (
-      <View
-        style={[
-          styles.todayDot,
-          isSelected ? styles.todayBackground : { backgroundColor: mainColor },
-        ]}
-      />
-    );
-  }, [isSelected, mainColor]);
+  const appointmentDot = useMemo(() => (
+    <View
+      style={[
+        styles.todayDot,
+        isSelected ? styles.todayBackground : { backgroundColor: mainColor },
+      ]}
+    />
+  ), [isSelected, mainColor]);
 
-  // Check if there is an appointment to mark time slot appropriately
-  const getAppointmentDot: () => React.JSX.Element | null = useCallback(() => {
+  const getAppointmentDot = useCallback(() => {
     if (scheduledAppointment?.appointmentDate) {
       if (
         selectedDateToCompare === appointmentDateToCompare &&
@@ -49,28 +73,19 @@ const TimeSlot = ({ value, onPress, selectedTime }: Props) => {
         return appointmentDot;
       }
     }
-
     return null;
-  }, [
-    appointmentDot,
-    scheduledAppointment,
-    appointmentDateToCompare,
-    selectedDateToCompare,
-    value,
-  ]);
+  }, [appointmentDot, scheduledAppointment, appointmentDateToCompare, selectedDateToCompare, value]);
+
+  const containerStyle = useMemo(() => {
+    if (isSelected) return { backgroundColor: mainColor };
+    if (isBetween) return { backgroundColor: mainColor + '40' }; // ~25% Opacity
+    return styles.unSelected;
+  }, [isSelected, isBetween, mainColor]);
 
   return (
     <TouchableOpacity onPress={onPress}>
-      <View
-        style={[
-          styles.container,
-          { width: timeSlotWidth },
-          isSelected ? { backgroundColor: mainColor } : styles.unSelected,
-        ]}
-      >
-        <Text
-          style={[isSelected ? styles.selectedText : styles.unSelectedText]}
-        >
+      <View style={[styles.container, { width: timeSlotWidth }, containerStyle]}>
+        <Text style={[(isSelected || isBetween) ? styles.selectedText : styles.unSelectedText]}>
           {value}
         </Text>
         {getAppointmentDot()}
