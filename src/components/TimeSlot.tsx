@@ -19,31 +19,50 @@ const TimeSlot = ({ value, onPress, startTime, endTime }: Props) => {
   const selectedDate = useContext(SelectedDateContext);
   const { mainColor, timeSlotWidth } = useContext(OverrideDataContext);
 
-  // Helper: Converts "09:30 AM" to 570 (minutes from midnight)
-  const convertToMinutes = (timeString: string | null) => {
+  // Robust helper to convert "09:30 AM" to minutes
+  const convertToMinutes = (timeString: string | null | undefined): number => {
     if (!timeString) return -1;
-    const [time, modifier] = timeString.split(' ');
-    let [hours, minutes] = time.split(':').map(Number);
 
+    // Destructuring with defaults prevents "possibly undefined"
+    const [time = "", modifier = ""] = timeString.split(' ');
+    const [hoursStr = "0", minutesStr = "0"] = time.split(':');
+
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    if (isNaN(hours) || isNaN(minutes) || !modifier) return -1;
+
+    const upperModifier = modifier.toUpperCase();
     if (hours === 12) {
-      hours = modifier === 'AM' ? 0 : 12;
-    } else if (modifier === 'PM') {
+      hours = upperModifier === 'AM' ? 0 : 12;
+    } else if (upperModifier === 'PM') {
       hours += 12;
     }
     return hours * 60 + minutes;
   };
 
-  const isSelected = value === startTime || value === endTime;
+  const isSelected = value !== null && (value === startTime || value === endTime);
 
   const isBetween = useMemo(() => {
     if (!startTime || !endTime) return false;
+
     const currentVal = convertToMinutes(value);
     const startVal = convertToMinutes(startTime);
     const endVal = convertToMinutes(endTime);
 
-    // Check range based on numerical values
-    return currentVal > startVal && currentVal < endVal;
+    if (currentVal === -1 || startVal === -1 || endVal === -1) return false;
+
+    const min = Math.min(startVal, endVal);
+    const max = Math.max(startVal, endVal);
+
+    return currentVal > min && currentVal < max;
   }, [value, startTime, endTime]);
+
+  const containerStyle = useMemo(() => {
+    if (isSelected) return { backgroundColor: mainColor };
+    if (isBetween) return { backgroundColor: mainColor + '40' };
+    return styles.unSelected;
+  }, [isSelected, isBetween, mainColor]);
 
   const appointmentDateToCompare = useMemo(
     () => scheduledAppointment?.appointmentDate?.split('T')[0],
@@ -75,12 +94,6 @@ const TimeSlot = ({ value, onPress, startTime, endTime }: Props) => {
     }
     return null;
   }, [appointmentDot, scheduledAppointment, appointmentDateToCompare, selectedDateToCompare, value]);
-
-  const containerStyle = useMemo(() => {
-    if (isSelected) return { backgroundColor: mainColor };
-    if (isBetween) return { backgroundColor: mainColor + '40' }; // ~25% Opacity
-    return styles.unSelected;
-  }, [isSelected, isBetween, mainColor]);
 
   return (
     <TouchableOpacity onPress={onPress}>
