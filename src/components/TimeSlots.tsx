@@ -5,8 +5,8 @@ import { theme } from '../utils/theme';
 
 interface Props {
   slotTimes: string[];
-  startTime: string | null; // Changed
-  endTime: string | null;   // Added
+  startTime: string | null;
+  endTime: string | null;
   setRange: (start: string | null, end: string | null) => void;
   title?: string;
   backgroundColor?: string;
@@ -18,39 +18,62 @@ const TimeSlots = ({
   startTime,
   endTime,
   setRange,
-  title = 'Select time',
+  title = 'Select time range',
   backgroundColor = theme.colors.white,
 }: Props) => {
+
+  // Helper: Same conversion logic to ensure numerical comparison
+  const convertToMinutes = (timeString: string | null | undefined): number => {
+    if (!timeString) return -1;
+    const [time = "", modifier = ""] = timeString.split(' ');
+    const [hoursStr = "0", minutesStr = "0"] = time.split(':');
+    let hours = parseInt(hoursStr, 10);
+    const minutes = parseInt(minutesStr, 10);
+
+    if (isNaN(hours) || isNaN(minutes) || !modifier) return -1;
+
+    const upperModifier = modifier.toUpperCase();
+    if (hours === 12) {
+      hours = upperModifier === 'AM' ? 0 : 12;
+    } else if (upperModifier === 'PM') {
+      hours += 12;
+    }
+    return hours * 60 + minutes;
+  };
+
   const onPress = (clickedTime: string) => {
+    const clickedVal = convertToMinutes(clickedTime);
+    const startVal = convertToMinutes(startTime);
+
+    // 1. If nothing selected or range already full, start new
     if (!startTime || (startTime && endTime)) {
-      // Start a new selection if nothing is selected or if a range was already complete
       setRange(clickedTime, null);
-    } else if (clickedTime < startTime) {
-      // If they click a time BEFORE the start, make that the new start
-      setRange(clickedTime, null);
-    } else if (clickedTime === startTime) {
-      // Deselect if they click the same one
+    }
+    // 2. Deselect if clicking the exact same time
+    else if (clickedTime === startTime) {
       setRange(null, null);
-    } else {
-      // It's after the start, so it's the end!
+    }
+    // 3. If clicked time is numerically BEFORE start time, reset start to the earlier time
+    else if (clickedVal < startVal) {
+      setRange(clickedTime, null);
+    }
+    // 4. Otherwise, it's a valid end time
+    else {
       setRange(startTime, clickedTime);
     }
   };
 
   const getTimeSlots = useCallback(() => {
-    return slotTimes.map((time) => {
-      return (
-        <View style={styles.timeSlotContainer} key={time}>
-          <TimeSlot
-            onPress={() => onPress(time)}
-            value={time}
-            startTime={startTime} // Pass these down
-            endTime={endTime}     // Pass these down
-          />
-        </View>
-      );
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return slotTimes.map((time) => (
+      <View style={styles.timeSlotContainer} key={time}>
+        <TimeSlot
+          onPress={() => onPress(time)}
+          value={time}
+          startTime={startTime}
+          endTime={endTime}
+        />
+      </View>
+    ));
   }, [slotTimes, startTime, endTime]);
 
   return (
